@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rtspWitness — Report</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-elev: #161b22;
+    --bg-elev2: #1c2330;
+    --border: #2d3645;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --ok: #3fb950;
+    --fail: #f85149;
+    --shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 0 0 60px;
+  }
+  header {
+    background: linear-gradient(135deg, #161b22 0%, #1c2742 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 24px;
+  }
+  header .wrap { max-width: 1280px; margin: 0 auto; }
+  h1 {
+    font-size: 26px; font-weight: 700; letter-spacing: -.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h1 .dot { color: var(--accent); }
+  header p { color: var(--muted); margin-top: 6px; font-size: 14px; }
+
+  .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+  .stat {
+    background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px; min-width: 120px;
+  }
+  .stat .num { font-size: 24px; font-weight: 700; }
+  .stat .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat.ok .num { color: var(--ok); }
+  .stat.fail .num { color: var(--fail); }
+  .stat.accent .num { color: var(--accent); }
+
+  .toolbar {
+    max-width: 1280px; margin: 24px auto 0; padding: 0 24px;
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  }
+  .search {
+    flex: 1; min-width: 220px; position: relative;
+  }
+  .search input {
+    width: 100%; background: var(--bg-elev); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 10px 12px 10px 36px; font-size: 14px;
+  }
+  .search input:focus { outline: none; border-color: var(--accent); }
+  .search::before {
+    content: "⌕"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 18px;
+  }
+  .filters { display: flex; gap: 8px; }
+  .filters button {
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--muted);
+    padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: all .15s;
+  }
+  .filters button:hover { color: var(--text); border-color: var(--accent); }
+  .filters button.active { background: var(--accent); color: #04122b; border-color: var(--accent); }
+
+  .grid {
+    max-width: 1280px; margin: 24px auto 0; padding: 0 24px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;
+  }
+  .card {
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; transition: transform .15s, border-color .15s;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card .thumb {
+    position: relative; aspect-ratio: 16/9; background: #000;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .card .thumb img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+  .card .thumb .noimg { color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
+  .badge {
+    position: absolute; top: 10px; left: 10px; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 20px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .badge.ok { background: rgba(63,185,80,.18); color: var(--ok); border: 1px solid rgba(63,185,80,.4); }
+  .badge.fail { background: rgba(248,81,73,.18); color: var(--fail); border: 1px solid rgba(248,81,73,.4); }
+  .res {
+    position: absolute; bottom: 10px; right: 10px; font-size: 11px;
+    background: rgba(0,0,0,.6); color: #fff; padding: 2px 8px; border-radius: 6px;
+  }
+  .card .body { padding: 12px 14px; }
+  .card .host { font-size: 14px; font-weight: 600; word-break: break-all; }
+  .card .url { font-size: 12px; color: var(--muted); word-break: break-all; margin-top: 4px; }
+  .card .err { font-size: 12px; color: var(--fail); margin-top: 6px; }
+  .card .meta { font-size: 11px; color: var(--gray, #6e7681); margin-top: 6px; }
+
+  .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
+
+  .pagination {
+    max-width: 1280px; margin: 28px auto 0; padding: 0 24px;
+    display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap;
+  }
+  .pagination button {
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+    min-width: 38px; height: 38px; padding: 0 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  .pagination button:hover:not(:disabled) { border-color: var(--accent); }
+  .pagination button.active { background: var(--accent); color: #04122b; border-color: var(--accent); font-weight: 700; }
+  .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+  .pagination .info { color: var(--muted); font-size: 13px; margin: 0 10px; }
+  .pagination select {
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px; font-size: 13px;
+  }
+
+  /* Lightbox */
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,.92); display: none;
+    align-items: center; justify-content: center; z-index: 100; padding: 30px; flex-direction: column;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 95%; max-height: 85%; border-radius: 8px; box-shadow: var(--shadow); }
+  .lightbox .cap { color: var(--text); margin-top: 16px; font-size: 14px; word-break: break-all; text-align: center; }
+  .lightbox .close {
+    position: absolute; top: 20px; right: 28px; color: #fff; font-size: 38px;
+    cursor: pointer; line-height: 1; background: none; border: none;
+  }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 50px; }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1><span class="dot">●</span> rtspWitness</h1>
+    <p>RTSP capture report · generated at 2026-06-24 11:12:12</p>
+    <div class="stats">
+      <div class="stat accent"><div class="num">58</div><div class="lbl">Total</div></div>
+      <div class="stat ok"><div class="num">44</div><div class="lbl">Captured</div></div>
+      <div class="stat fail"><div class="num">14</div><div class="lbl">Failed</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="search"><input id="search" type="text" placeholder="Filter by host, URL or error..."></div>
+  <div class="filters">
+    <button data-filter="all" class="active">All</button>
+    <button data-filter="ok">Captured</button>
+    <button data-filter="fail">Failed</button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+<div class="empty" id="empty" style="display:none">No results found.</div>
+<div class="pagination" id="pagination"></div>
+
+<div class="lightbox" id="lightbox">
+  <button class="close" id="lbClose">&times;</button>
+  <img id="lbImg" src="" alt="">
+  <div class="cap" id="lbCap"></div>
+</div>
+
+<footer>
+  Generated by <strong>rtspWitness</strong> · <a href="https://github.com/">github</a>
+</footer>
+
+<script>
+const DATA = [{"url": "rtsp://192.168.0.10:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTA8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.11:554/live.sdp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzJkMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTE8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.12:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTI8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.13:554/cam/realmonitor?channel=1", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.14:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTQ8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.15:554/axis-media/media.amp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTU8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.16:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTY8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.17:554/live.sdp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.18:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTg8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.19:554/cam/realmonitor?channel=1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzM4MmExYiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMTk8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.20:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjA8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.21:554/axis-media/media.amp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.22:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjI8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.23:554/live.sdp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzJkMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjM8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.24:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjQ8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.25:554/cam/realmonitor?channel=1", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.26:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjY8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.27:554/axis-media/media.amp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjc8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.28:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMjg8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.29:554/live.sdp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.30:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzA8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.31:554/cam/realmonitor?channel=1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzM4MmExYiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzE8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.32:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzI8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.33:554/axis-media/media.amp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.34:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzQ8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.35:554/live.sdp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzJkMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzU8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.36:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzY8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.37:554/cam/realmonitor?channel=1", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.38:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzg8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.39:554/axis-media/media.amp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuMzk8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.40:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDA8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.41:554/live.sdp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.42:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDI8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.43:554/cam/realmonitor?channel=1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzM4MmExYiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDM8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.44:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDQ8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.45:554/axis-media/media.amp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.46:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDY8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.47:554/live.sdp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzJkMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDc8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.48:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNDg8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.49:554/cam/realmonitor?channel=1", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.50:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTA8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.51:554/axis-media/media.amp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTE8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.52:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTI8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.53:554/live.sdp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.54:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTQ8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.55:554/cam/realmonitor?channel=1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzM4MmExYiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTU8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.56:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTY8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.57:554/axis-media/media.amp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.58:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTg8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.59:554/live.sdp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzJkMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNTk8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.60:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNjA8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.61:554/cam/realmonitor?channel=1", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.62:554/h264Preview_01_main", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMmYzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNjI8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.63:554/axis-media/media.amp", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMWIzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNjM8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.64:554/onvif1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMjgzOCIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNjQ8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY0MHg0ODA8L3RleHQ+CiAgICAgIDxjaXJjbGUgY3g9IjYwMCIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZjg1MTQ5Ii8+CiAgICA8L3N2Zz4=", "error": "", "width": 640, "height": 480, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.65:554/live.sdp", "status": "fail", "image": "", "error": "Host unreachable", "width": 0, "height": 0, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.66:554/Streaming/Channels/101", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFiMzgyNiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNjY8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5MjB4MTA4MDwvdGV4dD4KICAgICAgPGNpcmNsZSBjeD0iNjAwIiBjeT0iNDAiIHI9IjgiIGZpbGw9IiNmODUxNDkiLz4KICAgIDwvc3ZnPg==", "error": "", "width": 1920, "height": 1080, "timestamp": "2026-06-24T11:12:12"}, {"url": "rtsp://192.168.0.67:554/cam/realmonitor?channel=1", "status": "ok", "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NDAiIGhlaWdodD0iMzYwIj4KICAgICAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzM4MmExYiIvPgogICAgICA8cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MDAiIGhlaWdodD0iMzIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMTcwIiBmaWxsPSIjZmZmIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xOTIuMTY4LjAuNjc8L3RleHQ+CiAgICAgIDx0ZXh0IHg9IjMyMCIgeT0iMjEwIiBmaWxsPSIjZmZmZmZmYWEiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEyODB4NzIwPC90ZXh0PgogICAgICA8Y2lyY2xlIGN4PSI2MDAiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2Y4NTE0OSIvPgogICAgPC9zdmc+", "error": "", "width": 1280, "height": 720, "timestamp": "2026-06-24T11:12:12"}];
+let perPage = 24;
+let page = 1;
+let filter = "all";
+let query = "";
+
+const grid = document.getElementById("grid");
+const empty = document.getElementById("empty");
+const pag = document.getElementById("pagination");
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+function getFiltered() {
+  const q = query.toLowerCase();
+  return DATA.filter(d => {
+    if (filter !== "all" && d.status !== filter) return false;
+    if (!q) return true;
+    return (d.url + " " + (d.error || "")).toLowerCase().includes(q);
+  });
+}
+
+function hostOf(url) {
+  let b = url.split("://").pop();
+  if (b.includes("@")) b = b.split("@").pop();
+  return b.split("/")[0];
+}
+
+function render() {
+  const items = getFiltered();
+  const totalPages = Math.max(1, Math.ceil(items.length / perPage));
+  if (page > totalPages) page = totalPages;
+  const start = (page - 1) * perPage;
+  const slice = items.slice(start, start + perPage);
+
+  grid.innerHTML = "";
+  empty.style.display = items.length ? "none" : "block";
+
+  for (const d of slice) {
+    const card = document.createElement("div");
+    card.className = "card";
+    const host = escapeHtml(hostOf(d.url));
+    const url = escapeHtml(d.url);
+    let thumb;
+    if (d.status === "ok" && d.image) {
+      thumb = `<img src="${encodeURI(d.image)}" loading="lazy" data-full="${encodeURI(d.image)}" data-cap="${url}" alt="${host}">`
+            + `<span class="res">${d.width}×${d.height}</span>`;
+    } else {
+      thumb = `<div class="noimg">⚠ No image</div>`;
+    }
+    const badge = d.status === "ok"
+      ? `<span class="badge ok">online</span>`
+      : `<span class="badge fail">failed</span>`;
+    const err = d.error ? `<div class="err">${escapeHtml(d.error)}</div>` : "";
+    card.innerHTML =
+      `<div class="thumb">${badge}${thumb}</div>` +
+      `<div class="body">` +
+        `<div class="host">${host}</div>` +
+        `<div class="url">${url}</div>` +
+        err +
+        `<div class="meta">${escapeHtml(d.timestamp || "")}</div>` +
+      `</div>`;
+    grid.appendChild(card);
+  }
+
+  // Lightbox bindings
+  grid.querySelectorAll("img[data-full]").forEach(img => {
+    img.addEventListener("click", () => openLightbox(img.dataset.full, img.dataset.cap));
+  });
+
+  renderPagination(items.length, totalPages);
+}
+
+function renderPagination(total, totalPages) {
+  pag.innerHTML = "";
+  if (!total) return;
+
+  const mk = (label, p, opts = {}) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    if (opts.active) b.className = "active";
+    if (opts.disabled) b.disabled = true;
+    if (!opts.disabled && !opts.active) b.addEventListener("click", () => { page = p; render(); window.scrollTo({top:0,behavior:"smooth"}); });
+    return b;
+  };
+
+  pag.appendChild(mk("«", 1, { disabled: page === 1 }));
+  pag.appendChild(mk("‹", page - 1, { disabled: page === 1 }));
+
+  const win = 2;
+  let lo = Math.max(1, page - win), hi = Math.min(totalPages, page + win);
+  if (lo > 1) { pag.appendChild(mk("1", 1, { active: page === 1 })); if (lo > 2) pag.appendChild(dots()); }
+  for (let p = lo; p <= hi; p++) pag.appendChild(mk(String(p), p, { active: p === page }));
+  if (hi < totalPages) { if (hi < totalPages - 1) pag.appendChild(dots()); pag.appendChild(mk(String(totalPages), totalPages, { active: page === totalPages })); }
+
+  pag.appendChild(mk("›", page + 1, { disabled: page === totalPages }));
+  pag.appendChild(mk("»", totalPages, { disabled: page === totalPages }));
+
+  const info = document.createElement("span");
+  info.className = "info";
+  info.textContent = `${total} result(s) · page ${page}/${totalPages}`;
+  pag.appendChild(info);
+
+  const sel = document.createElement("select");
+  [12, 24, 48, 96].forEach(n => {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n + " / page";
+    if (n === perPage) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change", () => { perPage = +sel.value; page = 1; render(); });
+  pag.appendChild(sel);
+}
+
+function dots() {
+  const s = document.createElement("span");
+  s.className = "info"; s.textContent = "…";
+  return s;
+}
+
+// Lightbox
+const lightbox = document.getElementById("lightbox");
+const lbImg = document.getElementById("lbImg");
+const lbCap = document.getElementById("lbCap");
+function openLightbox(src, cap) {
+  lbImg.src = src; lbCap.textContent = decodeURIComponent(cap);
+  lightbox.classList.add("open");
+}
+function closeLightbox() { lightbox.classList.remove("open"); lbImg.src = ""; }
+document.getElementById("lbClose").addEventListener("click", closeLightbox);
+lightbox.addEventListener("click", e => { if (e.target === lightbox) closeLightbox(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
+
+// Controls
+document.getElementById("search").addEventListener("input", e => { query = e.target.value; page = 1; render(); });
+document.querySelectorAll(".filters button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filters button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    filter = btn.dataset.filter; page = 1; render();
+  });
+});
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# rtspWitness output
+rtspwitness_output/
+output/
+*.jpg
+*.jpeg
+*.png
+
+# Keep the example report and its embedded preview images
+!example.html
+
+# OS
+.DS_Store
+Thumbs.db

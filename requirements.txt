@@ -1,0 +1,3 @@
+# rtspWitness — dependencies
+# RTSP frame capture via the FFmpeg backend bundled with OpenCV.
+opencv-python>=4.8.0
