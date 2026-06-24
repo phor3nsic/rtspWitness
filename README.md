@@ -155,3 +155,9 @@ python main.py -l urls.txt -o output -w 20
 This tool is intended for **authorized security testing**, internal audits and
 educational purposes. Using it against systems without explicit permission may be
 illegal. You are solely responsible for how you use it.
+
+---
+
+## 📜 License
+
+Released under the [MIT License](LICENSE).
